@@ -1,5 +1,5 @@
-const { Product } = require('../model/Product');
-
+const { Product } = require('../model/ProductModel');
+// A query parameter is a key-value pair that is appended to the URL after a question mark (?). For example, in the URL http://example.com/api/products?category=smartphone, the category query parameter is set to smartphone.
 exports.createProduct = async (req, res) => {
   // this product we have to get from API body
   const product = new Product(req.body);
@@ -19,7 +19,7 @@ exports.fetchAllProducts = async (req, res) => {
   let query = Product.find({});
   let totalProductsQuery = Product.find({});
 
-  if (req.query.category) {
+  if (req.query.category) {//category query parameter exist? then
     query = query.find({ category: req.query.category });
     totalProductsQuery = totalProductsQuery.find({
       category: req.query.category,

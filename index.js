@@ -21,6 +21,43 @@ const cartRouter = require('./routes/Cart');
 const ordersRouter = require('./routes/Orders');
 const { User } = require('./model/UserModel');
 const { isAuth, sanitizeUser,cookieExtractor } = require('./services/common');
+const path= require('path');
+
+// Webhook
+
+// TODO: we will capture actual order after deploying out server live on public URL
+
+const endpointSecret = process.env.ENDPOINT_SECRET;
+
+server.post('/webhook', express.raw({type: 'application/json'}), (request, response) => {
+  const sig = request.headers['stripe-signature'];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
+  } catch (err) {
+    response.status(400).send(`Webhook Error: ${err.message}`);
+    return;
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const paymentIntentSucceeded = event.data.object;
+      console.log({paymentIntentSucceeded})
+      // Then define and call a function to handle the event payment_intent.succeeded
+      break;
+    // ... handle other event types
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+
+  // Return a 200 response to acknowledge receipt of the event
+  response.send();
+});
+
+
 
 // JWT options
 const opts = {};
@@ -28,7 +65,7 @@ opts.jwtFromRequest = cookieExtractor;
 opts.secretOrKey = process.env.SECRET_KEY; // TODO: should not be in code;
 
 //middlewares
-server.use(express.static('build'));
+server.use(express.static(path.resolve(__dirname,'build')));
 server.use(cookieParser());
 server.use(
   session({
@@ -43,6 +80,7 @@ server.use(
     exposedHeaders: ['X-Total-Count'],
   })
 );
+
 server.use(express.json()); // to parse req.body
 server.use('/products', isAuth(), productsRouter.router);
 // we can also use JWT token for client-only auth
@@ -77,7 +115,7 @@ passport.use(
             return done(null, false, { message: 'invalid credentials' });
           }
           const token = jwt.sign(sanitizeUser(user), process.env.SECRET_KEY);
-          done(null, {token}); // this lines sends to serializer
+          done(null, {id:user.id, role:user.role, token}); // this lines sends to serializer
         }
       );
     } catch (err) {
@@ -120,6 +158,32 @@ passport.deserializeUser(function (user, cb) {
   });
 });
 
+// Payments
+
+
+// This is your test secret API key.
+const stripe = require("stripe")(process.env.STRIPE_SERVER);
+
+
+server.post("/create-payment-intent", async (req, res) => {
+  const { totalAmount } = req.body;
+
+  // Create a PaymentIntent with the order amount and currency
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: totalAmount*100, // for decimal compensation
+    currency: "inr",
+    automatic_payment_methods: {
+      enabled: true,
+    },
+  });
+
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
+});
+
+
+
 main().catch((err) => console.log(err));
 
 async function main() {
@@ -127,6 +191,6 @@ async function main() {
   console.log("database connected to MONGODB ATLAS");
 }
 
-server.listen(4339, () => {
-  console.log('server started');
+server.listen(process.env.PORT, () => {
+  console.log('server started on port', process.env.PORT);
 });

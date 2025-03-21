@@ -29,4 +29,3 @@ Code was deployed in vercel.
 - API Authentication using Passport JWT
 - MongoDB Atlas cloud database
 - Vercel Server deployment
-- Payments using Stripe - PaymentIntent based custom flow
